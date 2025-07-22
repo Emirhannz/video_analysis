@@ -1,0 +1,189 @@
+
+
+🔸 *Bir başkasına verdiğinde veya başka bir yapay zekaya attığında* ne yaptığını açıkça göstersin.
+🔸 *Sen kendin uygularken tik tik ilerleyip* her adımı kontrol ederek gidebilesin.
+
+---
+
+# 🎯 Proje Planı: Video'dan Anlamlı Metin ve Bilgi Çıkarım Sistemi
+
+---
+
+## 🎬 A. GİRİŞ
+
+Bu sistem, bir haber veya video kaydını işleyerek içeriğinde geçen metinleri düzgün şekilde çıkarır, temizler, birleştirir ve anlamlı bir rapora dönüştürür. Kullanım amacı:
+
+* Altyazıların, sabit yazıların ve kayan metinlerin doğru tespiti
+* Tekrar eden, bozuk veya eksik metinlerin filtrelenmesi
+* Doğal dil işleme yoluyla içerik sınıflandırması (isim, marka, haber içeriği vs.)
+* Sonuçta videoyu izlemeye gerek kalmadan **özet bir rapor oluşturulması**
+
+---
+
+## 🧱 B. KULLANILACAK TEMEL BİLEŞENLER
+
+| Bileşen                   | Açıklama                                                     |
+| ------------------------- | ------------------------------------------------------------ |
+| **PaddleOCR**             | Yazı tespiti ve tanıma (OCR) için güçlü bir framework        |
+| **RapidFuzz**             | Benzer metinlerin gruplanması, tekrarların engellenmesi      |
+| **Optical Flow (OpenCV)** | Kayan yazıların takibi (altyazı, jenerik, scroll)            |
+| **NLP: spaCy, Stanza**    | Yazılardan kişi, marka, konu, olay gibi bilgilerin çıkarımı  |
+| **Yerel LLM (opsiyonel)** | İleri düzey özetleme ve içerik üretimi (phi-3, mistral, vb.) |
+
+---
+
+## 🔧 C. ADIM ADIM PROJE UYGULAMA PLANI
+
+---
+
+### ✅ 1. VİDEODAN FRAME ÇIKARMA
+
+🛠️ Yapılacaklar:
+
+* OpenCV kullanarak her 1 saniyede bir kare al (isteğe bağlı daha sık).
+* Her karenin zaman damgasını sakla (örn. frame\_0015.jpg @ 15.0s)
+
+📂 Çıktı klasörü:
+
+```
+frames/
+  frame_0001.jpg
+  frame_0002.jpg
+  ...
+```
+
+---
+
+### ✅ 2. PADDLEOCR ENTEGRASYONU
+
+🛠️ Yapılacaklar:
+
+* `paddleocr` ve `paddlepaddle` kütüphanelerini kur
+* Türkçe destekli modeli indir
+* EasyOCR’den geçiş yap (easyocr devre dışı)
+
+📝 Not:
+
+* Paddle’da Türkçe model yoksa default Latin alfabesi ile oku
+* Çıkan yazıları sonra `fix_turkish_chars()` fonksiyonuyla düzeltiriz
+  (örn. `CUMHUR|` → `CUMHURİYET`)
+
+📦 Örnek Python paketi kurulumu:
+
+```bash
+pip install paddleocr
+pip install paddlepaddle
+```
+
+---
+
+### ✅ 3. METİN TEMİZLEME & GRUPLAMA (FILTRASYON)
+
+🛠️ Yapılacaklar:
+
+* Her yazı kutusunun koordinat ve zaman bilgilerini sakla
+* Aynı pozisyonda çıkan benzer yazıları `RapidFuzz` ile karşılaştır
+* Farkı %10’dan az olanları aynı metin olarak grupla ve tek yaz
+
+📦 Kullanılacak modül:
+
+```bash
+pip install rapidfuzz
+```
+
+📝 Not: Koordinat + zaman + benzerlik eşleşirse → aynı yazı kabul edilir.
+
+---
+
+### ✅ 4. OPTICAL FLOW İLE METİN TAKİBİ
+
+🛠️ Yapılacaklar:
+
+* `cv2.calcOpticalFlowFarneback()` veya `cv2.TrackerCSRT_create()` ile kayan yazıları takip et
+* Yazı kutuları frame frame nasıl hareket ediyor, onları birleştir
+* Bu sayede akan altyazılar düzgün şekilde tam cümle olarak çıkar
+
+📦 Gereken modül:
+
+```bash
+pip install opencv-python
+```
+
+---
+
+### ✅ 5. TÜRKÇE KARAKTER DÜZENLEMESİ (İSTEĞE BAĞLI)
+
+🛠️ Yapılacaklar:
+
+* OCR sonucu bozuk Türkçe karakterler varsa (örn. `|`, `l`, `I`, `i`), bunları `fix_turkish_chars()` gibi bir fonksiyonla düzelt
+* Gerekirse `tr_char_map = {'l': 'ı', '|': 'i', ...}` gibi mapping yaz
+
+---
+
+### ✅ 6. METİNLERİ KATEGORİZE ETME (SABİT - CANLI - BAĞIMSIZ)
+
+🛠️ Yapılacaklar:
+
+* Koordinat + süre analizi yap
+* Sabit yazılar: uzun süre aynı yerde kalanlar
+* Canlı yazılar: değişen ama aynı yerde aktarılan yazılar (alt yazı gibi)
+* Bağımsız: her frame’de farklı içerik çıkanlar
+
+📝 Not:
+
+* Bu ayrım senin GUI’de sabit/canlı/bağımsız panelini doldurmak için şart
+
+---
+
+### ✅ 7. NLP ANALİZİ (KİŞİ – MARKA – OLAY – TARİH – vs.)
+
+🛠️ Yapılacaklar:
+
+* Çıkan düzgün metinleri `spaCy` veya `stanza` gibi kütüphanelerle analiz et
+* Named Entity Recognition (NER) uygula
+* "Videoda geçen markalar", "kişiler", "haber konusu" gibi alanları çıkar
+
+📦 Python için:
+
+```bash
+pip install spacy
+python -m spacy download xx_ent_wiki_sm  # Türkçe NER için alternatifler de var
+```
+
+---
+
+### ✅ 8. RAPOR ÜRETİMİ
+
+🛠️ Yapılacaklar:
+
+* NLP ile etiketlenen içerikleri güzel formatta raporla
+* `.txt`, `.json` veya `.gz` formatında dışa aktar
+* Örnek çıktı:
+
+```
+📺 Video Raporu:
+- Markalar: Star TV, ASELSAN
+- Kişiler: Ali Veli, Sermin Baysal Ata
+- Olaylar: Ankara'da trafik kazası
+```
+
+---
+
+### 🔄 9. (OPSİYONEL) YEREL LLM ENTEGRASYONU
+
+🛠️ Yapılacaklar:
+
+* LLM kullanarak metinleri özetle veya yaratıcı yorumlar al
+* `ollama`, `llama-cpp`, `transformers` ile kullanabilirsin
+
+📝 Bu adım en sonda, sistem çalışır hale geldikten sonra yapılabilir.
+
+---
+
+## ✅ SONUÇ VE YÖNETİM
+
+* Her adım bağımsız olarak test edilebilir
+* İlk önce OCR → Temizleme → Takip → Sınıflandırma → NLP zinciri kurulacak
+* En son adımda tüm bu çıktılar birleşip **videoyu izlemeye gerek kalmadan anlaşılabilir hale getirilecek**
+
+
