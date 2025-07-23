@@ -4,12 +4,14 @@ import os
 import numpy as np
 from typing import List, Dict
 from rapidfuzz import fuzz
+from optical_flow_tracker import OpticalFlowTracker
 
 class VideoFrameAnalyzer(VideoAnalyzer):
     def __init__(self, video_path: str):
         super().__init__(None)  # frames_dir artık kullanılmayacak
         self.video_path = video_path
         self.processed_texts = []
+        self.optical_flow_tracker = OpticalFlowTracker()
         
     def get_video_frames(self) -> List[Dict]:
         """Videodan frame'leri doğrudan oku"""
@@ -62,70 +64,59 @@ class VideoFrameAnalyzer(VideoAnalyzer):
         if not frames:
             print("İşlenecek frame bulunamadı!")
             return []
-            
+
         current_texts = []
         total_frames = len(frames)
-        
+
         print(f"\nToplam {total_frames} frame işlenecek...")
         print("Bu işlem biraz zaman alabilir, lütfen bekleyin...")
-        
+
         for i, frame_data in enumerate(frames, 1):
             frame = frame_data['frame']
             timestamp = frame_data['timestamp']
             frame_no = frame_data['frame_no']
-            
+
             print(f"\rFrame işleniyor: {i}/{total_frames} ({(i/total_frames)*100:.1f}%) - {timestamp:.2f}s", end="")
-            
+
             # Frame'deki metinleri al
             frame_texts = self.text_analyzer.process_frame_array(frame)
-            
+
+            # Optical flow ile akan yazıları tespit et ve birleştir
+            flowing_texts = self.optical_flow_tracker.process_frame(frame, frame_texts)
+
             # Frame'de metin bulunduysa işle
             if frame_texts:
-                print(f"\nFrame {frame_no} ({timestamp:.2f}s): {len(frame_texts)} metin bulundu:")
-                for ft in frame_texts[:3]:  # İlk 3 metni göster
-                    print(f"  - {ft['text']}")
-            
-            for text_info in frame_texts:
-                text = text_info['text']
-                coords = text_info['coords']
-                
-                # Gelişmiş benzer metin kontrolü ve gruplama
-                is_similar = False
-                best_match = None
-                best_score = 0
-                
-                for idx, existing in enumerate(current_texts):
-                    if self.text_analyzer.compare_texts(text, existing['text']):
-                        is_similar = True
-                        ratio = fuzz.ratio(text.lower(), existing['text'].lower())
-                        if ratio > best_score:
-                            best_score = ratio
-                            best_match = idx
-                
-                if not is_similar:
-                    # Yeni benzersiz metin ekle
-                    text_entry = {
-                        'text': text,
-                        'timestamp': timestamp,
-                        'frame_no': frame_no,
-                        'coords': coords,
-                        'occurrences': 1,
-                        'variations': [text]
-                    }
-                    current_texts.append(text_entry)
-                    self.processed_texts.append(text_entry)
-                elif best_match is not None:
-                    # Mevcut metni güncelle
-                    current_texts[best_match]['occurrences'] += 1
-                    if text not in current_texts[best_match]['variations']:
-                        current_texts[best_match]['variations'].append(text)
-        
-        print(f"\n\nToplam {len(self.processed_texts)} benzersiz metin bulundu.")
+                completed_sentences = []
+                for ft in frame_texts:
+                    if ft.get('text'):
+                        sentences = self.text_analyzer.sentence_buffer.add_text(ft['text'])
+                        if sentences:
+                            for sentence in sentences:
+                                if self.text_analyzer.is_valid_sentence(sentence):
+                                    completed_sentences.append({
+                                        'text': sentence,
+                                        'timestamp': timestamp,
+                                        'frame_no': frame_no,
+                                        'coords': ft['coords'],
+                                        'entities': self.text_analyzer.extract_entities(sentence)
+                                    })
+
+                if completed_sentences:
+                    print(f"\nFrame {frame_no} ({timestamp:.2f}s): {len(completed_sentences)} cümle tamamlandı:")
+                    for cs in completed_sentences[:2]:  # İlk 2 cümleyi göster
+                        print(f"  - {cs['text']}")
+
+                current_texts.extend(completed_sentences)
+
+        # Add processed sentences to self.processed_texts
+        self.processed_texts.extend(current_texts)
+
+        print(f"\n\nToplam {len(current_texts)} benzersiz cümle bulundu.")
         return current_texts
 
 def main():
     # Video dosyasının yolu (örnek)
-    video_path = "ornekvideo4.mp4"  # videoyu buraya koyun
+    video_path = "ornekvideo6.mp4"  # videoyu buraya koyun
     
     if not os.path.exists(video_path):
         print(f"HATA: Video dosyası bulunamadı: {video_path}")

@@ -1,0 +1,98 @@
+
+## 🧾 GitHub Issue Listesi
+
+---
+
+### ✅ **Issue 1: Frame Başına Yazmak Yerine Cümle Tamamlanınca Yazılsın**
+
+**Title:** Implement sentence buffer to write only complete sentences
+**Description:**
+
+> Şu an her frame’deki metin direkt olarak rapora yazılıyor. Bunun yerine, metin bir buffer’da biriktirilmeli ve ancak bir cümle nokta (`.`), ünlem (`!`) veya soru işareti (`?`) ile bitince kaydedilmelidir.
+>
+> 🔧 Önerilen çözüm:
+>
+> * Frame metinleri `accumulated_text` içinde tutulmalı
+> * Noktalama veya uzunluk eşiği tamamlandığında bu metin `processed_texts` listesine alınmalı
+>
+> 🎯 Amaç: Daha okunabilir, anlamlı ve tekrar içermeyen altyazı çıkarımı.
+
+---
+
+### ✅ **Issue 2: Add Sentence-Aware Filtering to Text Comparison**
+
+**Title:** Improve compare\_texts() with sentence logic and stricter filtering
+**Description:**
+
+> Şu an `compare_texts()` fonksiyonu metinleri benzerliğe göre karşılaştırıyor, fakat bozuk veriler (ör: `ısraıı-gkry`) çok kolay eşleşiyor.
+>
+> 🔧 Yapılacaklar:
+>
+> * Metinlerin tamamlanmış cümle olup olmadığı kontrol edilmeli
+> * Belirli bir skorun altında olan eşleşmeler tamamen filtrelenmeli
+> * Çok kısa metinler (2-3 harf) için eşik daha yüksek olmalı
+>
+> 🎯 Amaç: Daha doğru gruplama, daha az bozuk varyasyon.
+
+---
+
+### ✅ **Issue 3: Add Timestamped Sentences to the Final Report**
+
+**Title:** Add timestamped, cleaned sentences to video report
+**Description:**
+
+> Rapor dosyasında sadece metin grupları değil, her tamamlanmış cümleye ait zaman damgası da yer almalı.
+>
+> 🔧 Önerilen örnek çıktı:
+>
+> ```
+> [00:01:03] Erdoğan: Sorun İsrail'in Suriye'de çatışmayı bahane etmesi.
+> ```
+>
+> 🎯 Amaç: Videoyu izlemeden içeriği kolayca anlamak.
+
+---
+
+### ✅ **Issue 4: Integrate NLP Toolkit for Sentence Validation and Entity Detection**
+
+**Title:** Add NLP layer to validate sentences and extract named entities
+**Description:**
+
+> OCR sonrası gelen metinlerin anlamlı bir bütün oluşturup oluşturmadığı kontrol edilmeli. Ayrıca kişi, yer, kurum gibi varlıklar çıkarılmalı.
+>
+> 🔧 Kullanılabilecek araçlar:
+>
+> * `spaCy` (tr\_pipelines)
+> * `Stanza` (Türkçe destekli)
+>
+> 🎯 Amaç: Cümle doğrulama + içerik sınıflandırma (kim konuştu, konu ne, yer neresi?)
+
+---
+
+### ✅ **Issue 5: Optional LLM Integration for Summarization or Topic Tagging**
+
+**Title:** Integrate LLM (e.g. Mistral or Phi-3) for optional summarization
+**Description:**
+
+> İşlenmiş tüm cümleler, yerel ya da API tabanlı bir LLM ile özetlenebilir veya konuya göre etiketlenebilir.
+>
+> 🔧 Önerilen kullanım:
+>
+> * Toplanan altyazı metinleri LLM’e gönderilir
+> * Özet, başlık, konu, olay bilgisi alınır
+>
+> 🎯 Amaç: Kullanıcıya tek bakışta videonun özünü sunmak.
+
+
+
+📺 Video Özeti (Yapay Zeka Temelli):
+
+🔹 Üst Bölge (Sabit Logo): TRT Haber  
+🔹 Alt Bölge (Altyazılar):
+
+[00:01:03] Erdoğan: İsrail'in Suriye'deki çatışmaları bahane ederek müdahale ettiğini söyledi.  
+[00:01:07] Türkiye, bu projeye karşı devreye girdi.
+...
+
+
+

@@ -36,62 +36,43 @@ class VideoAnalyzer:
         if not frames:
             print("İşlenecek frame bulunamadı!")
             return []
-            
+
         current_texts = []
         total_frames = len(frames)
         processed_count = 0  # İşlenen metin sayısı
-        
+
         print(f"\nToplam {total_frames} frame işlenecek...")
         print("Bu işlem biraz zaman alabilir, lütfen bekleyin...")
-        
+
         for i, frame_path in enumerate(frames, 1):
             print(f"\rFrame işleniyor: {i}/{total_frames} ({(i/total_frames)*100:.1f}%)", end="")
-            
+
             # Frame'deki metinleri al
             frame_texts = self.text_analyzer.process_frame(frame_path)
-            
+
             # Frame'de metin bulunduysa işle
             if frame_texts:
-                print(f"\nFrame {i}: {len(frame_texts)} metin bulundu:")
-                for ft in frame_texts[:3]:  # İlk 3 metni göster
-                    print(f"  - {ft['text']}")
-            
-            for text_info in frame_texts:
-                text = text_info['text']
-                coords = text_info['coords']
-                
-                # Gelişmiş benzer metin kontrolü ve gruplama
-                is_similar = False
-                best_match = None
-                best_score = 0
-                
-                for idx, existing in enumerate(current_texts):
-                    if self.text_analyzer.compare_texts(text, existing['text']):
-                        is_similar = True
-                        # En iyi eşleşmeyi bul
-                        ratio = fuzz.ratio(text.lower(), existing['text'].lower())
-                        if ratio > best_score:
-                            best_score = ratio
-                            best_match = idx
-                
-                if not is_similar:
-                    # Yeni benzersiz metin ekle
-                    text_entry = {
-                        'text': text,
-                        'frame': frame_path,
-                        'coords': coords,
-                        'occurrences': 1,
-                        'variations': [text]
-                    }
-                    current_texts.append(text_entry)
-                    self.processed_texts.append(text_entry)
-                elif best_match is not None:
-                    # Mevcut metni güncelle ve varyasyonları kaydet
-                    current_texts[best_match]['occurrences'] += 1
-                    if text not in current_texts[best_match]['variations']:
-                        current_texts[best_match]['variations'].append(text)
-        
-        print(f"\n\nToplam {len(self.processed_texts)} benzersiz metin bulundu.")
+                completed_sentences = []
+                for ft in frame_texts:
+                    if ft.get('text'):
+                        sentences = self.text_analyzer.sentence_buffer.add_text(ft['text'])
+                        if sentences:
+                            for sentence in sentences:
+                                if self.text_analyzer.is_valid_sentence(sentence):
+                                    completed_sentences.append({
+                                        'text': sentence,
+                                        'coords': ft['coords'],
+                                        'entities': self.text_analyzer.extract_entities(sentence)
+                                    })
+
+                if completed_sentences:
+                    print(f"\nFrame {i}: {len(completed_sentences)} cümle tamamlandı:")
+                    for cs in completed_sentences[:2]:  # İlk 2 cümleyi göster
+                        print(f"  - {cs['text']}")
+
+                current_texts.extend(completed_sentences)
+
+        print(f"\n\nToplam {len(current_texts)} benzersiz cümle bulundu.")
         return current_texts
 
     def generate_report(self):
@@ -100,6 +81,9 @@ class VideoAnalyzer:
             return "Henüz metin işlenmemiş."
         
         report = "📺 Video Metin Raporu:\n\n"
+        
+        # Tüm metinleri birleştir (özet için)
+        all_text = ""
         
         # Metinleri koordinatlarına göre grupla
         top_texts = []    # Üst bölge metinleri
