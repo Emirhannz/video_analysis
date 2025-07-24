@@ -1,0 +1,170 @@
+
+
+# 🚧 Detaylı Issue Listesi
+
+## ✅ **Issue 1: Bounding Box Tracker (DeepSORT veya SORT) Optical Flow'a Entegrasyonu**
+
+**Amaç:**
+Mevcut optical flow yöntemini güçlendirmek, hareketli altyazıları daha net ve tutarlı takip etmek.
+
+### 📍 Yapılacaklar:
+
+* [ ] **1. SORT Seçimi ve Yükleme:**
+
+ sort.py dosyasını projeye yükledik ve gerekli kütüğhaneleri kurduk. incele
+
+
+
+* [ ] **2. SORT Tracker'ın Projeye Entegrasyonu:**
+
+  * Tracker'ı frame bazında çalıştıran wrapper class oluştur:
+
+    ```python
+    class BoundingBoxTracker:
+        def __init__(self):
+            self.tracker = Sort()  # SORT tracker instance oluştur
+        
+        def update(self, detections):
+            # detections: [[x1, y1, x2, y2, confidence], ...]
+            tracked_boxes = self.tracker.update(np.array(detections))
+            return tracked_boxes
+    ```
+
+* [ ] **3. Optical Flow Tracker ile SORT Tracker'ı Birleştir:**
+
+  * Optical Flow Tracker (`process_frame`) içine SORT tracker eklenmeli:
+
+    * Her OCR algılanan kutu SORT tracker’a input olarak verilmeli.
+    * Her frame için `BoundingBoxTracker.update()` çağrılarak kutu takibi yapılmalı.
+    * SORT’dan dönen kutuların koordinatlarıyla Optical Flow'dan gelen kutular birleştirilmeli.
+
+* [ ] **4. Çıktıları Test Et ve Optimize Et:**
+
+  * Tracker’ların performansını birkaç farklı video ile test et.
+  * Sonuçların tutarlılığına göre tracker parametrelerini ayarla.
+
+---
+
+## ✅ **Issue 2: SpaCy NLP Pipeline'ının Sıfırdan Kurulması ve Tüm Cümlelerin Analiz Edilmesi**
+
+**Amaç:**
+SpaCy NLP pipeline'ın etkin çalışmasını sağlamak ve cümlelerin detaylı analiz edilerek entity extraction ve POS tagging yapılması.
+
+### 📍 Yapılacaklar:
+
+* [ ] **1. Mevcut SpaCy ve Hugging Face Kontrolü**
+
+  Kontrol ettik- başarılı
+
+
+
+* [ ] **2. SpaCy Pipeline Sınıfını Yeniden Oluştur:**
+
+  ```python
+  import spacy
+
+  class NLPProcessor:
+      def __init__(self):
+          self.nlp = spacy.load("tr_core_news_trf")
+      
+      def analyze_sentence(self, sentence):
+          doc = self.nlp(sentence)
+          entities = [{'text': ent.text, 'label': ent.label_} for ent in doc.ents]
+          pos_tags = [{'text': token.text, 'pos': token.pos_, 'lemma': token.lemma_} for token in doc]
+          return {
+              'entities': entities,
+              'pos_tags': pos_tags
+          }
+  ```
+
+* [ ] **3. Tüm Cümlelerin NLP Analizinden Geçirilmesi:**
+
+  * `VideoAnalyzer` içindeki cümle işlemede şu örneği kullan:
+
+  ```python
+  nlp_processor = NLPProcessor()
+
+  for sentence in completed_sentences:
+      analysis = nlp_processor.analyze_sentence(sentence['text'])
+      sentence['entities'] = analysis['entities']
+      sentence['pos_tags'] = analysis['pos_tags']
+  ```
+
+* [ ] **4. Sonuçları Test Et ve Entity Çıkarımını Doğrula:**
+
+  * Birkaç örnek metin üzerinde entity ve POS taglerini kontrol et:
+
+  ```python
+  sentence = "Cumhurbaşkanı Erdoğan Ankara'da konuştu."
+  analysis = nlp_processor.analyze_sentence(sentence)
+  print(analysis['entities'])  # [{'text': 'Erdoğan', 'label': 'PERSON'}, {'text': 'Ankara', 'label': 'LOC'}]
+  ```
+
+---
+
+## ✅ **Issue 3: NLP Tabanlı Cümle Tamamlama ve Sentence Buffer Mekanizmasının Geliştirilmesi**
+
+**Amaç:**
+Sentence Buffer mekanizmasının NLP destekli daha akıllı çalışması, daha doğru ve mantıklı cümlelerin üretilmesi.
+
+### 📍 Yapılacaklar:
+
+* [ ] **1. Hugging Face Transformer ile Türkçe Modeli Seç ve Kur:**
+
+  * Tavsiye edilen model: [mT5-small Turkish](https://huggingface.co/google/mt5-small)
+
+  ```bash
+  pip install transformers sentencepiece
+  ```
+
+* [ ] **2. NLP Destekli SentenceBuffer Class'ı Oluştur:**
+
+  ```python
+  from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+  class NLPEnhancedSentenceBuffer:
+      def __init__(self, model_name="google/mt5-small"):
+          self.buffer = ""
+          self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+          self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+      def add_text(self, text):
+          self.buffer += " " + text.strip()
+          sentences = self._complete_sentences()
+          return sentences
+
+      def _complete_sentences(self):
+          inputs = self.tokenizer.encode("tamamla: " + self.buffer, return_tensors="pt")
+          outputs = self.model.generate(inputs, max_length=100)
+          result = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+          # cümle sonunu bul ve buffer'ı temizle
+          if result.endswith(('.', '?', '!')):
+              self.buffer = ""
+              return [result.strip()]
+          return []
+  ```
+
+* [ ] **3. Yeni Buffer’ı VideoAnalyzer’e Entegre Et:**
+
+  * Mevcut buffer yerine NLP destekli buffer'ı çağır:
+
+  ```python
+  self.sentence_buffer = NLPEnhancedSentenceBuffer()
+  completed_sentences = self.sentence_buffer.add_text(frame_text)
+  ```
+
+* [ ] **4. Sonuçları Test Et ve Optimize Et:**
+
+  * Çeşitli videolarda oluşan cümleleri incele.
+  * Cümle tamamlama başarısını değerlendir ve gerekli ayarlamaları (örneğin max\_length veya tokenizer parametreleri) yap.
+
+---
+
+## 📌 **Ekip için Son Not:**
+
+* Bu issue listesindeki her adım titizlikle uygulandığında, NLP ve takip problemlerinin çözüleceğini net olarak göreceksiniz.
+* SpaCy modeli düzgün yüklenmişse tekrar yüklenmesi gerekmez. Mevcut SpaCy’nin doğruluğu ve etkin kullanımı üzerine odaklanmanız yeterli olacaktır.
+* Türkçe karakter düzeltmeleri, OCR iyileştirmeleri gibi diğer işler **bu listedeki adımlar tamamlandıktan sonra** ayrıca ele alınmalıdır.
+
+

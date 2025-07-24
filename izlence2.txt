@@ -1,0 +1,76 @@
+
+
+### ✅ **Issue 1: Implement Subtitle Sentence Buffer (Zaman Bazlı Cümle Birleştirme)**
+
+**Title:** Merge fragmented subtitles into full sentences using a time-based buffer
+**Description:**
+Altyazılar genelde tek seferde tüm cümleyi içermez. Bu nedenle, `SentenceBuffer` benzeri bir yapı kullanarak:
+
+* Altyazı parçalarını biriktir
+* Cümle `.` `?` `!` ile bitince veya `max_time_window` (örn. 4 saniye) dolunca birleştir
+* Tamamlanmış cümleyi `subtitle_sentences` listesine ekle
+
+🎯 Amaç: Parça parça gelen altyazı cümlelerini bütün olarak yazmak.
+
+---
+
+### ✅ **Issue 2: Track Text Motion Vectors with Optical Flow**
+
+**Title:** Classify moving text using Optical Flow motion vectors
+**Description:**
+Her bir metin kutusu için Optical Flow ile bir hareket vektörü hesaplanmalı.
+Eğer bu vektör belirli bir uzunluk üzerindeyse (örneğin > 10 px/frame), bu metin **akan metin** (subtitle, jenerik, vs.) olarak sınıflandırılmalı.
+Sabit metinlerin vektörü ≈ 0’dır.
+
+🎯 Amaç: Sabit ve dinamik metinleri güvenli şekilde ayırt etmek.
+
+---
+
+### ✅ **Issue 3: Use Short-Lived Text Duration as a Secondary Indicator**
+
+**Title:** Support subtitle detection with short text lifespan heuristics
+**Description:**
+Bir metin sadece 1–2 saniye görünüp kayboluyorsa, bu onun “geçici” (subtitle/ticker) olabileceğini gösterir.
+Bu kriter, Optical Flow + buffer sistemine **yardımcı** olarak uygulanmalı.
+
+🎯 Amaç: Cümle tamamlanmadan yok olan altyazı parçalarını kaçırmamak.
+
+---
+
+### ✅ **Issue 4: Combine Motion and Duration to Robustly Identify Dynamic Text**
+
+**Title:** Combine motion vector and lifespan to classify dynamic vs static text
+**Description:**
+`motion_vector.length > 10` ve `lifespan < 3s` olan metinler, kesinlikle akan metin (subtitle, jenerik) olarak etiketlenmeli.
+Bu şekilde sadece bir kriterle yanlış sınıflandırma riski azaltılır.
+
+🎯 Amaç: Dinamik metinleri yanlış sabit sayma veya tam tersine düşmeyi engellemek.
+
+---
+
+### ✅ **Issue 5: Add OCR Box Size + Confidence Filter**
+
+**Title:** Filter noisy OCR detections based on confidence and text box area
+**Description:**
+OCR sonuçlarının doğruluğunu artırmak için küçük ve düşük güven skorlu metinler filtrelenmeli:
+
+```python
+if confidence > 0.4 and bounding_box_area > threshold:
+    keep
+```
+
+🎯 Amaç: Alakasız veya bozuk karakterleri rapora yansıtmamak.
+
+---
+
+## 🧠 Bonus (Opsiyonel):
+
+### 🔲 **Issue 6 (Future): Use LLM to Clean and Summarize Subtitles**
+
+**Title:** Use LLM to complete broken subtitle fragments and summarize
+**Description:**
+Cümle tamamlama ve anlamlandırma için altyazı metinleri bir LLM’e verilip özet çıkarılabilir.
+Bu işlem isteğe bağlı yapılmalı, offline modellerle de entegre edilebilir.
+
+---
+

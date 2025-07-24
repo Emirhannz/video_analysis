@@ -79,22 +79,23 @@ class VideoAnalyzer:
         """İşlenmiş metinlerden rapor oluştur"""
         if not self.processed_texts:
             return "Henüz metin işlenmemiş."
-        
+
         report = "📺 Video Metin Raporu:\n\n"
-        
+
         # Tüm metinleri birleştir (özet için)
         all_text = ""
-        
+
         # Metinleri koordinatlarına göre grupla
         top_texts = []    # Üst bölge metinleri
         bottom_texts = [] # Alt bölge metinleri
         other_texts = []  # Diğer bölge metinleri
-        
+
         for text_info in self.processed_texts:
             try:
                 coords = text_info['coords']
                 text = text_info['text']
-                
+                timestamp = text_info.get('timestamp', 0)  # Zaman damgası
+
                 # Koordinat formatını kontrol et
                 if isinstance(coords, list) and len(coords) > 0:
                     if isinstance(coords[0], list):
@@ -103,13 +104,14 @@ class VideoAnalyzer:
                         y_coord = coords[1]     # [x1,y1,x2,y2,...] formatı
                 else:
                     y_coord = 300  # Varsayılan olarak orta bölgeye koy
-                
+
                 text_info_with_variations = {
                     'text': text,
                     'variations': text_info.get('variations', [text]),
-                    'occurrences': text_info.get('occurrences', 1)
+                    'occurrences': text_info.get('occurrences', 1),
+                    'timestamp': timestamp
                 }
-                
+
                 if y_coord < 200:  # Üst bölge
                     top_texts.append(text_info_with_variations)
                 elif y_coord > 400:  # Alt bölge
@@ -118,32 +120,28 @@ class VideoAnalyzer:
                     other_texts.append(text_info_with_variations)
             except Exception as e:
                 print(f"Metin koordinat hatası: {text} - {str(e)}")
-                other_texts.append({'text': text, 'variations': [text], 'occurrences': 1})  # Hata durumunda orta bölgeye koy
-        
+
+        def format_texts_with_timestamp(texts):
+            formatted = ""
+            for text_info in texts:
+                timestamp = text_info.get('timestamp', 0)
+                minutes = int(timestamp // 60)
+                seconds = int(timestamp % 60)
+                formatted += f"  - [{minutes}:{seconds:02d}] {text_info['text']}\n"
+            return formatted
+
         if top_texts:
             report += "🔸 Üst Bölge Metinleri:\n"
-            for text_info in top_texts:
-                report += f"  - {text_info['text']}"
-                if len(text_info['variations']) > 1:
-                    report += f" ({text_info['occurrences']} kez, varyasyonlar: {', '.join(text_info['variations'])})"
-                report += "\n"
+            report += format_texts_with_timestamp(top_texts)
             report += "\n"
-            
+
         if bottom_texts:
             report += "🔸 Alt Bölge Metinleri (Altyazılar):\n"
-            for text_info in bottom_texts:
-                report += f"  - {text_info['text']}"
-                if len(text_info['variations']) > 1:
-                    report += f" ({text_info['occurrences']} kez, varyasyonlar: {', '.join(text_info['variations'])})"
-                report += "\n"
+            report += format_texts_with_timestamp(bottom_texts)
             report += "\n"
-            
+
         if other_texts:
             report += "🔸 Diğer Metinler:\n"
-            for text_info in other_texts:
-                report += f"  - {text_info['text']}"
-                if len(text_info['variations']) > 1:
-                    report += f" ({text_info['occurrences']} kez, varyasyonlar: {', '.join(text_info['variations'])})"
-                report += "\n"
-        
+            report += format_texts_with_timestamp(other_texts)
+
         return report

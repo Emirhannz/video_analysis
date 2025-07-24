@@ -1,4 +1,4 @@
-from paddleocr import PaddleOCR
+from easyocr import Reader
 import os
 from rapidfuzz import fuzz
 import re
@@ -8,8 +8,8 @@ import spacy
 
 class TextAnalyzer:
     def __init__(self):
-        # PaddleOCR ayarları - varsayılan
-        self.ocr = PaddleOCR()
+        # EasyOCR ayarları - varsayılan
+        self.ocr = Reader(['tr'], gpu=True)
         self.sentence_buffer = SentenceBuffer()
 
         # SpaCy Türkçe Transformer modelini yükle
@@ -68,13 +68,13 @@ class TextAnalyzer:
             doc = self.nlp(text)
             has_verb = any(token.pos_ == "VERB" for token in doc)
             has_noun = any(token.pos_ == "NOUN" for token in doc)
-            return has_verb and has_noun
+            return has_verb or has_noun  # Hem fiil hem isim yerine biri yeterli
 
         # Basit kontrol (SpaCy yoksa)
         words = text.lower().split()
         has_verb = any(word.endswith(tuple(self.verb_suffixes)) for word in words)
         has_noun = any(word in self.common_nouns for word in words)
-        return has_verb and has_noun
+        return has_verb or has_noun  # Hem fiil hem isim yerine biri yeterli
 
     def extract_entities(self, text: str) -> dict:
         """Metindeki varlıkları (kişi, yer, kurum vs.) çıkar"""
@@ -96,22 +96,26 @@ class TextAnalyzer:
         """Metni normalize et ve temizle"""
         if not text:
             return ""
-            
+
         # Metindeki özel boşluk karakterlerini normal boşluğa çevir
         text = text.replace('\u200b', ' ')  # Zero-width space
         text = text.replace('\xa0', ' ')    # Non-breaking space
         text = text.replace('\t', ' ')      # Tab
         text = text.replace('\n', ' ')      # Newline
-        
+
+        # Özel karakterleri temizle
+        text = text.replace('"', '')  # Çift tırnak
+        text = text.replace("'", '')  # Tek tırnak
+
         # Önce tüm metni küçük harfe çevir
         text = text.lower()
-        
+
         # Türkçe karakterleri düzelt (büyük/küçük harf duyarlı)
         normalized = text
         for wrong, correct in self.tr_char_map.items():
             normalized = normalized.replace(wrong.lower(), correct)
             normalized = normalized.replace(wrong.upper(), correct)
-        
+
         # Kelimeleri ayır ve tekrar birleştir (boşlukları düzenle)
         words = []
         current_word = ""
@@ -129,21 +133,21 @@ class TextAnalyzer:
                     words.append(char)
         if current_word:
             words.append(current_word)
-            
+
         # Kelimeleri birleştir
         normalized = ''.join(words)
-        
+
         # Çoklu boşlukları tekil boşluğa çevir
         normalized = re.sub(r'\s+', ' ', normalized)
-        
+
         # Noktalama işaretlerini koru ama fazla olanları temizle
         normalized = re.sub(r'[.]{2,}', '.', normalized)  # ... -> .
         normalized = re.sub(r'[!]{2,}', '!', normalized)  # !!! -> !
         normalized = re.sub(r'[?]{2,}', '?', normalized)  # ??? -> ?
-        
+
         # Noktalama işaretlerinden sonra boşluk ekle
         normalized = re.sub(r'([.,!?])([^\s])', r'\1 \2', normalized)
-        
+
         # Baştaki ve sondaki boşlukları temizle
         return normalized.strip()
     
@@ -235,75 +239,47 @@ class TextAnalyzer:
         """Numpy array olarak frame'i işle"""
         texts = []
         try:
-            result = self.ocr.ocr(frame_array)
-            if not result:
-                return []
-                
-            for page_result in result:
-                if isinstance(page_result, dict):
-                    found_texts = page_result.get('rec_texts', [])
-                    scores = page_result.get('rec_scores', [])
-                    boxes = page_result.get('rec_boxes', [])
-                    
-                    for i in range(len(found_texts)):
-                        if i < len(scores) and i < len(boxes):
-                            text = str(found_texts[i])
-                            score = float(scores[i])
-                            box = boxes[i]
-                            
-                            # Önce Türkçe karakterleri düzelt
-                            fixed_text = self.fix_turkish_chars(text)
-                            # Sonra metni tamamen normalize et
-                            normalized_text = self.normalize_text(fixed_text)
-                            
-                            if normalized_text.strip() and score > 0.5:
-                                texts.append({
-                                    'text': normalized_text,
-                                    'coords': box.tolist() if hasattr(box, 'tolist') else box,
-                                    'confidence': score
-                                })
+            result = self.ocr.readtext(frame_array)
+            for (bbox, text, confidence) in result:
+                # Önce Türkçe karakterleri düzelt
+                fixed_text = self.fix_turkish_chars(text)
+                # Sonra metni tamamen normalize et
+                normalized_text = self.normalize_text(fixed_text)
+
+                if normalized_text.strip() and confidence > 0.5:
+                    texts.append({
+                        'text': normalized_text,
+                        'coords': bbox,
+                        'confidence': confidence
+                    })
         except Exception as e:
             print(f"HATA: Frame işlenirken hata oluştu: {str(e)}")
-        
+
         return texts
-        
+
     def process_frame(self, frame_path):
         if not os.path.exists(frame_path):
             print(f"HATA: Frame bulunamadı: {frame_path}")
             return []
-            
+
         texts = []
         try:
-            result = self.ocr.ocr(frame_path)
-            if not result:
-                return []
-                
-            for page_result in result:
-                if isinstance(page_result, dict):
-                    found_texts = page_result.get('rec_texts', [])
-                    scores = page_result.get('rec_scores', [])
-                    boxes = page_result.get('rec_boxes', [])
-                    
-                    for i in range(len(found_texts)):
-                        if i < len(scores) and i < len(boxes):
-                            text = str(found_texts[i])
-                            score = float(scores[i])
-                            box = boxes[i]
-                            
-                            # Önce Türkçe karakterleri düzelt
-                            fixed_text = self.fix_turkish_chars(text)
-                            # Sonra metni tamamen normalize et
-                            normalized_text = self.normalize_text(fixed_text)
-                            
-                            if normalized_text.strip() and score > 0.5:
-                                texts.append({
-                                    'text': normalized_text,
-                                    'coords': box.tolist() if hasattr(box, 'tolist') else box,
-                                    'confidence': score
-                                })
+            result = self.ocr.readtext(frame_path)
+            for (bbox, text, confidence) in result:
+                # Önce Türkçe karakterleri düzelt
+                fixed_text = self.fix_turkish_chars(text)
+                # Sonra metni tamamen normalize et
+                normalized_text = self.normalize_text(fixed_text)
+
+                if normalized_text.strip() and confidence > 0.5:
+                    texts.append({
+                        'text': normalized_text,
+                        'coords': bbox,
+                        'confidence': confidence
+                    })
         except Exception as e:
             print(f"HATA: {str(e)}")
-        
+
         return texts
     
     def compare_texts(self, text1, text2, coords1=None, coords2=None, threshold=65):

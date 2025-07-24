@@ -10,7 +10,7 @@ class SentenceBuffer:
         """
         self.buffer += " " + text.strip()
         self.buffer = self.buffer.strip()
-        
+
         completed_sentences = []
         while True:
             # Tamamlanmış cümle var mı kontrol et
@@ -19,7 +19,7 @@ class SentenceBuffer:
                 idx = self.buffer.find(marker)
                 if idx != -1 and (end_index == -1 or idx < end_index):
                     end_index = idx + 1
-            
+
             # Tamamlanmış cümle varsa ayır
             if end_index != -1:
                 sentence = self.buffer[:end_index].strip()
@@ -28,16 +28,13 @@ class SentenceBuffer:
                 self.buffer = self.buffer[end_index:].strip()
             else:
                 break
-                
-        # Buffer çok uzunsa zorla böl
+
+        # Eğer buffer çok uzunsa ve cümle sonlandırıcı yoksa zorla böl
         if len(self.buffer) > self.max_buffer_size:
-            last_space = self.buffer.rfind(' ', 0, self.max_buffer_size)
-            if last_space != -1:
-                sentence = self.buffer[:last_space].strip()
-                if sentence:
-                    completed_sentences.append(sentence + "...")
-                self.buffer = self.buffer[last_space:].strip()
-            
+            sentence = self.buffer[:self.max_buffer_size].strip()
+            completed_sentences.append(sentence + "...")
+            self.buffer = ""
+
         return completed_sentences
         
     def get_pending(self) -> str:

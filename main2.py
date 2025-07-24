@@ -5,6 +5,9 @@ import numpy as np
 from typing import List, Dict
 from rapidfuzz import fuzz
 from optical_flow_tracker import OpticalFlowTracker
+import torch  # GPU kontrolü için PyTorch eklendi
+import spacy
+import easyocr
 
 class VideoFrameAnalyzer(VideoAnalyzer):
     def __init__(self, video_path: str):
@@ -116,28 +119,73 @@ class VideoFrameAnalyzer(VideoAnalyzer):
 
 def main():
     # Video dosyasının yolu (örnek)
-    video_path = "ornekvideo6.mp4"  # videoyu buraya koyun
-    
+    video_path = "ornekvideo7.mp4"  # videoyu buraya koyun
+
     if not os.path.exists(video_path):
         print(f"HATA: Video dosyası bulunamadı: {video_path}")
         return
-    
+
     # Video analiz nesnesini oluştur
     analyzer = VideoFrameAnalyzer(video_path)
-    
+
     print("Video işleniyor...")
     analyzer.process_video()
-    
+
     print("\nRapor oluşturuluyor...")
     report = analyzer.generate_report()
-    
+
     print("\n" + "="*50 + "\n")
     print(report)
-    
-    # Raporu dosyaya kaydet
-    with open('video_report.txt', 'w', encoding='utf-8') as f:
+
+    # Raporu 'rapor' klasörüne kaydet
+    rapor_klasoru = "rapor"
+    os.makedirs(rapor_klasoru, exist_ok=True)
+    video_baslik = os.path.splitext(os.path.basename(video_path))[0]
+    rapor_dosyasi = os.path.join(rapor_klasoru, f"{video_baslik}.txt")
+
+    with open(rapor_dosyasi, 'w', encoding='utf-8') as f:
         f.write(report)
-    print("\nRapor 'video_report.txt' dosyasına kaydedildi.")
+    print(f"\nRapor '{rapor_dosyasi}' dosyasına kaydedildi.")
+
+# GPU'nun aktif olup olmadığını kontrol et ve yazdır
+def test_gpu_usage():
+    print("\nGPU Kullanılabilirlik Testi:")
+    if torch.cuda.is_available():
+        print("PyTorch GPU kullanabiliyor.")
+        try:
+            # Basit bir tensör işlemi yaparak GPU'yu test et
+            x = torch.rand(3, 3).cuda()
+            print("PyTorch GPU testi başarılı: Tensor işlemi tamamlandı.")
+        except Exception as e:
+            print(f"PyTorch GPU testi başarısız: {e}")
+    else:
+        print("PyTorch GPU kullanamıyor.")
+
+    # OpenCV'nin CUDA desteğini kontrol et
+    try:
+        if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+            print("OpenCV CUDA desteği aktif.")
+        else:
+            print("OpenCV CUDA desteği pasif.")
+    except Exception as e:
+        print(f"OpenCV CUDA kontrolü başarısız: {e}")
+
+# SpaCy modelini manuel olarak yükle
+try:
+    print("SpaCy modeli yükleniyor: tr_core_news_trf")
+    nlp = spacy.load("tr_core_news_trf")
+    print("SpaCy modeli başarıyla yüklendi.")
+except Exception as e:
+    print(f"SpaCy modeli yüklenirken hata: {e}")
+
+# EasyOCR'nin GPU kullanıp kullanmadığını test et
+try:
+    print("\nEasyOCR GPU Testi:")
+    reader = easyocr.Reader(['tr'], gpu=torch.cuda.is_available())
+    print("EasyOCR başarıyla yüklendi ve GPU kullanımı test edildi.")
+except Exception as e:
+    print(f"EasyOCR GPU testi başarısız: {e}")
 
 if __name__ == "__main__":
+    test_gpu_usage()
     main()
